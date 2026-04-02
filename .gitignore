@@ -1,0 +1,14 @@
+__pycache__/
+*.pyc
+*.pyo
+.env
+*.sav
+*.log
+.venv/
+venv/
+*.png
+analiz.py
+chisquare.py
+.claude/
+fig*.png
+chi_fig*.png

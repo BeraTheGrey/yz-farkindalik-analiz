@@ -1,0 +1,1278 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>YZ Farkındalık — Analiz Sistemi</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
+<script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+<style>
+:root{
+  --sidebar-bg:#0f172a;--sidebar-w:250px;--accent:#3b82f6;
+  --accent2:#8b5cf6;--success:#22c55e;--danger:#ef4444;
+  --card-bg:#ffffff;--body-bg:#f1f5f9;--text-main:#1e293b;
+}
+*{box-sizing:border-box;}
+body{margin:0;font-family:'Segoe UI',system-ui,sans-serif;background:var(--body-bg);color:var(--text-main);}
+
+/* ── Sidebar ── */
+#sidebar{
+  position:fixed;top:0;left:0;height:100vh;width:var(--sidebar-w);
+  background:var(--sidebar-bg);overflow-y:auto;z-index:100;
+  display:flex;flex-direction:column;
+}
+#sidebar::-webkit-scrollbar{width:4px;}
+#sidebar::-webkit-scrollbar-thumb{background:#334155;border-radius:4px;}
+.brand{
+  padding:20px 16px 14px;border-bottom:1px solid #1e293b;
+  font-size:.75rem;font-weight:700;color:#94a3b8;letter-spacing:.08em;text-transform:uppercase;
+}
+.brand span{display:block;font-size:1rem;font-weight:800;color:#f1f5f9;margin-top:3px;}
+.nav-section{
+  padding:14px 16px 4px;font-size:.65rem;font-weight:800;
+  color:#94a3b8;letter-spacing:.12em;text-transform:uppercase;
+}
+.nav-item a{
+  display:flex;align-items:center;gap:10px;padding:9px 16px;
+  color:#cbd5e1;text-decoration:none;border-radius:0;font-size:.83rem;
+  transition:all .15s;cursor:pointer;border-left:3px solid transparent;
+}
+.nav-item a:hover{background:#1e293b;color:#f1f5f9;border-left-color:#475569;}
+.nav-item a.active{background:#1e3a5f;color:#ffffff;border-left-color:var(--accent);font-weight:600;}
+.nav-item a .icon{width:18px;text-align:center;font-size:.9rem;}
+
+/* ── Main ── */
+#main{margin-left:var(--sidebar-w);min-height:100vh;}
+#topbar{
+  background:#fff;border-bottom:1px solid #e2e8f0;
+  padding:10px 24px;display:flex;align-items:center;justify-content:space-between;
+  position:sticky;top:0;z-index:50;
+}
+#topbar .title{font-weight:700;font-size:1rem;color:var(--text-main);}
+#topbar .badge-n{background:var(--accent);color:#fff;border-radius:20px;padding:3px 10px;font-size:.75rem;}
+#content{padding:24px;}
+
+/* ── Panel ── */
+.panel{display:none;}
+.panel.active{display:block;}
+
+/* ── Card ── */
+.card{border:none;border-radius:12px;box-shadow:0 1px 6px rgba(0,0,0,.07);margin-bottom:20px;}
+.card-header{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;
+             border-radius:12px 12px 0 0!important;padding:14px 20px;
+             font-weight:700;font-size:.9rem;display:flex;align-items:center;gap:8px;}
+.card-header .icon{font-size:1rem;}
+.card-body{padding:20px;}
+
+/* ── Form elements ── */
+.form-label{font-weight:600;font-size:.82rem;color:#475569;margin-bottom:4px;}
+.form-select,.form-control{
+  border:1.5px solid #e2e8f0;border-radius:8px;font-size:.85rem;
+  padding:8px 12px;transition:border .2s;
+}
+.form-select:focus,.form-control:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(59,130,246,.15);}
+.btn-run{
+  background:linear-gradient(135deg,var(--accent),var(--accent2));
+  border:none;color:#fff;border-radius:8px;padding:10px 28px;
+  font-weight:700;font-size:.9rem;cursor:pointer;transition:opacity .2s;
+  display:flex;align-items:center;gap:8px;
+}
+.btn-run:hover{opacity:.9;}
+.btn-run:disabled{opacity:.5;cursor:not-allowed;}
+
+/* ── Result card ── */
+.result-wrap{display:none;}
+.result-wrap.show{display:block;}
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:12px;margin-bottom:16px;}
+.stat-box{
+  background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:10px;
+  padding:12px;text-align:center;
+}
+.stat-box .val{font-size:1.4rem;font-weight:800;color:var(--accent);}
+.stat-box .lbl{font-size:.7rem;color:#64748b;margin-top:2px;font-weight:600;text-transform:uppercase;}
+.stat-box.sig .val{color:var(--success);}
+.stat-box.nsig .val{color:#94a3b8;}
+.interpretation{
+  background:#f0f9ff;border-left:4px solid var(--accent);
+  padding:12px 16px;border-radius:0 8px 8px 0;font-size:.85rem;line-height:1.6;
+  margin:14px 0;
+}
+.chart-wrap{border-radius:10px;overflow:hidden;border:1.5px solid #e2e8f0;margin-top:14px;}
+
+/* ── Table ── */
+.table-wrap{max-height:300px;overflow:auto;border-radius:8px;border:1.5px solid #e2e8f0;margin-top:14px;}
+.table{font-size:.8rem;margin:0;}
+.table thead{background:#1e293b;color:#fff;position:sticky;top:0;}
+.table td,.table th{padding:6px 12px;}
+.table-striped tbody tr:nth-child(odd){background:#f8fafc;}
+.sig-row{background:#fef3c7!important;}
+.sig-row td{font-weight:600;}
+
+/* ── Spinner ── */
+.spinner{display:none;text-align:center;padding:40px;}
+.spinner.show{display:block;}
+.lds-ring{display:inline-block;width:40px;height:40px;}
+.lds-ring div{box-sizing:border-box;display:block;position:absolute;
+              width:32px;height:32px;margin:4px;border:4px solid var(--accent);
+              border-radius:50%;animation:lds-ring 1.2s cubic-bezier(.5,0,.5,1) infinite;
+              border-color:var(--accent) transparent transparent transparent;}
+.lds-ring div:nth-child(2){animation-delay:-.45s;}
+.lds-ring div:nth-child(3){animation-delay:-.3s;}
+@keyframes lds-ring{0%{transform:rotate(0)}100%{transform:rotate(360deg)}}
+
+/* ── Test Bilgi Kartı ── */
+.info-card{
+  background:linear-gradient(135deg,#f0fdf4,#f0f9ff);
+  border:1.5px solid #bae6fd;border-radius:12px;
+  padding:16px 20px;margin-bottom:18px;font-size:.83rem;
+}
+.info-card .info-title{
+  font-weight:800;font-size:.9rem;color:#0369a1;margin-bottom:8px;
+  display:flex;align-items:center;gap:6px;
+}
+.info-card .formula{
+  background:#fff;border:1.5px dashed #7dd3fc;border-radius:8px;
+  padding:8px 14px;font-family:'Courier New',monospace;font-size:.92rem;
+  color:#0c4a6e;font-weight:700;margin:8px 0;letter-spacing:.02em;
+}
+.info-card .info-row{margin:4px 0;color:#334155;line-height:1.5;}
+.info-card .info-row b{color:#0369a1;}
+.info-card .tag{
+  display:inline-block;background:#dbeafe;color:#1e40af;
+  border-radius:4px;padding:1px 7px;font-size:.73rem;font-weight:700;margin:2px 2px 0 0;
+}
+.info-card .tag.warn{background:#fef9c3;color:#713f12;}
+.info-card .tag.good{background:#dcfce7;color:#14532d;}
+.info-toggle{
+  cursor:pointer;font-size:.8rem;color:#0369a1;font-weight:600;
+  display:flex;align-items:center;gap:4px;margin-bottom:10px;
+  user-select:none;
+}
+.info-toggle:hover{text-decoration:underline;}
+
+/* ── Misc ── */
+.section-title{font-size:1.25rem;font-weight:800;color:var(--text-main);margin-bottom:4px;}
+.section-sub{font-size:.82rem;color:#64748b;margin-bottom:20px;}
+.badge{font-size:.78rem!important;}
+.posthoc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:8px;}
+.posthoc-item{
+  border:1.5px solid #e2e8f0;border-radius:8px;padding:10px 14px;
+  font-size:.8rem;display:flex;justify-content:space-between;align-items:center;
+}
+.posthoc-item.sig{border-color:#22c55e;background:#f0fdf4;}
+
+/* ── Var group selector ── */
+.var-check-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:6px;
+                max-height:200px;overflow-y:auto;padding:10px;
+                background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:8px;}
+</style>
+</head>
+<body>
+
+<!-- ═══════════════ SIDEBAR ═══════════════ -->
+<nav id="sidebar">
+  <div class="brand">
+    Üretken YZ Araştırması
+    <span>📊 Analiz Sistemi</span>
+  </div>
+
+  <div class="nav-section">Genel</div>
+  <ul class="nav flex-column mb-0">
+    <li class="nav-item"><a onclick="show('overview')"><span class="icon">🏠</span> Veri Özeti</a></li>
+    <li class="nav-item"><a onclick="show('descriptive')"><span class="icon">📈</span> Tanımlayıcı İstatistik</a></li>
+    <li class="nav-item"><a onclick="show('normality')"><span class="icon">📐</span> Normallik Testi</a></li>
+  </ul>
+
+  <div class="nav-section">Kategorik Testler</div>
+  <ul class="nav flex-column mb-0">
+    <li class="nav-item"><a onclick="show('chisquare')"><span class="icon">🔲</span> Ki-Kare Testi</a></li>
+    <li class="nav-item"><a onclick="show('chisquare_sorular')"><span class="icon">📋</span> Soru Bazlı Ki-Kare</a></li>
+  </ul>
+
+  <div class="nav-section">Grup Karşılaştırma</div>
+  <ul class="nav flex-column mb-0">
+    <li class="nav-item"><a onclick="show('ttest')"><span class="icon">⚖️</span> Bağımsız T-Testi</a></li>
+    <li class="nav-item"><a onclick="show('mannwhitney')"><span class="icon">🔀</span> Mann-Whitney U</a></li>
+    <li class="nav-item"><a onclick="show('wilcoxon')"><span class="icon">🔁</span> Wilcoxon İşaretli Sıra</a></li>
+    <li class="nav-item"><a onclick="show('anova')"><span class="icon">📊</span> Tek Yönlü ANOVA</a></li>
+    <li class="nav-item"><a onclick="show('kruskal')"><span class="icon">📉</span> Kruskal-Wallis</a></li>
+  </ul>
+
+  <div class="nav-section">İlişki Analizi</div>
+  <ul class="nav flex-column mb-0">
+    <li class="nav-item"><a onclick="show('correlation')"><span class="icon">🔗</span> Korelasyon</a></li>
+    <li class="nav-item"><a onclick="show('corrmatrix')"><span class="icon">🟦</span> Korelasyon Matrisi</a></li>
+  </ul>
+
+  <div class="nav-section">Ölçek Analizi</div>
+  <ul class="nav flex-column mb-0">
+    <li class="nav-item"><a onclick="show('reliability')"><span class="icon">🎯</span> Güvenilirlik (α)</a></li>
+    <li class="nav-item"><a onclick="show('subscale')"><span class="icon">🕸️</span> Alt Boyut Analizi</a></li>
+  </ul>
+</nav>
+
+<!-- ═══════════════ MAIN ═══════════════ -->
+<div id="main">
+  <div id="topbar">
+    <span class="title">Üretken YZ — Etik & Sosyal Risk Farkındalık Araştırması</span>
+    <span class="badge-n" id="topbadge">n=108 · 32 madde · 6 alt boyut</span>
+  </div>
+  <div id="content">
+
+    <!-- ╔══════════════════ PANEL: OVERVIEW ══════════════════╗ -->
+    <div class="panel active" id="panel-overview">
+      <div class="section-title">🏠 Veri Özeti</div>
+      <div class="section-sub">Örneklemin genel demografik dağılımı ve betimsel istatistikler</div>
+      <div id="overview-chart" class="chart-wrap" style="min-height:540px;display:flex;align-items:center;justify-content:center;">
+        <div class="spinner show"><div class="lds-ring"><div></div><div></div><div></div></div><br><small style="color:#94a3b8">Yükleniyor…</small></div>
+      </div>
+    </div>
+
+    <!-- ╔══════════════════ PANEL: DESCRIPTIVE ══════════════════╗ -->
+    <div class="panel" id="panel-descriptive">
+      <div class="section-title">📈 Tanımlayıcı İstatistikler</div>
+      <div class="section-sub">Seçilen değişken için merkezi eğilim, yayılım ve dağılım ölçüleri</div>
+      <div id="info-descriptive"></div>
+      <div class="card">
+        <div class="card-header"><span class="icon">⚙️</span> Analiz Ayarları</div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-md-5">
+              <label class="form-label">Değişken</label>
+              <select class="form-select" id="desc-var"></select>
+            </div>
+            <div class="col-md-5">
+              <label class="form-label">Gruplama Değişkeni <small class="text-muted">(isteğe bağlı)</small></label>
+              <select class="form-select" id="desc-grp"></select>
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+              <button class="btn-run w-100" onclick="runDescriptive()"><i class="fa fa-play"></i> Analiz Et</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="spinner" id="desc-spin"><div class="lds-ring"><div></div><div></div><div></div></div></div>
+      <div class="result-wrap" id="desc-result"></div>
+    </div>
+
+    <!-- ╔══════════════════ PANEL: NORMALITY ══════════════════╗ -->
+    <div class="panel" id="panel-normality">
+      <div class="section-title">📐 Normallik Testi</div>
+      <div class="section-sub">Shapiro-Wilk ve Kolmogorov-Smirnov normallik testleri, Q-Q grafiği</div>
+      <div id="info-normality"></div>
+      <div class="card">
+        <div class="card-header"><span class="icon">⚙️</span> Analiz Ayarları</div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-md-8">
+              <label class="form-label">Değişken</label>
+              <select class="form-select" id="norm-var"></select>
+            </div>
+            <div class="col-md-4 d-flex align-items-end">
+              <button class="btn-run w-100" onclick="runNormality()"><i class="fa fa-play"></i> Analiz Et</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="spinner" id="norm-spin"><div class="lds-ring"><div></div><div></div><div></div></div></div>
+      <div class="result-wrap" id="norm-result"></div>
+    </div>
+
+    <!-- ╔══════════════════ PANEL: CHI-SQUARE ══════════════════╗ -->
+    <div class="panel" id="panel-chisquare">
+      <div class="section-title">🔲 Ki-Kare Testi</div>
+      <div class="section-sub">İki kategorik değişken arasındaki ilişkiyi test eder (Pearson χ²)</div>
+      <div id="info-chisquare"></div>
+      <div class="card">
+        <div class="card-header"><span class="icon">⚙️</span> Analiz Ayarları</div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-md-4">
+              <label class="form-label">1. Değişken (satır)</label>
+              <select class="form-select" id="chi-v1"></select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">2. Değişken (sütun)</label>
+              <select class="form-select" id="chi-v2"></select>
+            </div>
+            <div class="col-md-4 d-flex align-items-end">
+              <button class="btn-run w-100" onclick="runChisquare()"><i class="fa fa-play"></i> Analiz Et</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="spinner" id="chi-spin"><div class="lds-ring"><div></div><div></div><div></div></div></div>
+      <div class="result-wrap" id="chi-result"></div>
+    </div>
+
+    <!-- ╔══════════════════ PANEL: CHI-SQUARE SORULAR ══════════════════╗ -->
+    <div class="panel" id="panel-chisquare_sorular">
+      <div class="section-title">📋 Soru Bazlı Ki-Kare Analizi</div>
+      <div class="section-sub">32 soruyu seçilen demografik değişkene göre tek tek veya toplu ki-kare ile test eder</div>
+      <div id="info-chisquare_sorular"></div>
+      <div class="card">
+        <div class="card-header"><span class="icon">⚙️</span> Analiz Ayarları</div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-md-4">
+              <label class="form-label">Demografik Değişken (grup)</label>
+              <select class="form-select" id="csq-grp"></select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Soru <small class="text-muted">(boş bırakırsan tüm 32 soru)</small></label>
+              <select class="form-select" id="csq-soru"></select>
+            </div>
+            <div class="col-md-4 d-flex align-items-end">
+              <button class="btn-run w-100" onclick="runChisquareSorular()"><i class="fa fa-play"></i> Analiz Et</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="spinner" id="csq-spin"><div class="lds-ring"><div></div><div></div><div></div></div></div>
+      <div class="result-wrap" id="csq-result"></div>
+    </div>
+
+    <!-- ╔══════════════════ PANEL: T-TEST ══════════════════╗ -->
+    <div class="panel" id="panel-ttest">
+      <div class="section-title">⚖️ Bağımsız T-Testi</div>
+      <div class="section-sub">İki bağımsız grup arasındaki ortalama farkını test eder</div>
+      <div id="info-ttest"></div>
+      <div class="card">
+        <div class="card-header"><span class="icon">⚙️</span> Analiz Ayarları</div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-md-4">
+              <label class="form-label">Grup Değişkeni <small class="text-muted">(2 kategori)</small></label>
+              <select class="form-select" id="tt-grp"></select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Bağımlı Değişken (sayısal)</label>
+              <select class="form-select" id="tt-var"></select>
+            </div>
+            <div class="col-md-4 d-flex align-items-end">
+              <button class="btn-run w-100" onclick="runTtest()"><i class="fa fa-play"></i> Analiz Et</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="spinner" id="tt-spin"><div class="lds-ring"><div></div><div></div><div></div></div></div>
+      <div class="result-wrap" id="tt-result"></div>
+    </div>
+
+    <!-- ╔══════════════════ PANEL: MANN-WHITNEY ══════════════════╗ -->
+    <div class="panel" id="panel-mannwhitney">
+      <div class="section-title">🔀 Mann-Whitney U Testi</div>
+      <div class="section-sub">İki bağımsız grubun dağılımlarını parametrik olmayan yöntemle karşılaştırır</div>
+      <div id="info-mannwhitney"></div>
+      <div class="card">
+        <div class="card-header"><span class="icon">⚙️</span> Analiz Ayarları</div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-md-4">
+              <label class="form-label">Grup Değişkeni <small class="text-muted">(2 kategori)</small></label>
+              <select class="form-select" id="mw-grp"></select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Bağımlı Değişken (sayısal)</label>
+              <select class="form-select" id="mw-var"></select>
+            </div>
+            <div class="col-md-4 d-flex align-items-end">
+              <button class="btn-run w-100" onclick="runMW()"><i class="fa fa-play"></i> Analiz Et</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="spinner" id="mw-spin"><div class="lds-ring"><div></div><div></div><div></div></div></div>
+      <div class="result-wrap" id="mw-result"></div>
+    </div>
+
+    <!-- ╔══════════════════ PANEL: WILCOXON ══════════════════╗ -->
+    <div class="panel" id="panel-wilcoxon">
+      <div class="section-title">🔁 Wilcoxon İşaretli Sıra Testi</div>
+      <div class="section-sub">Eşleştirilmiş iki ölçüm veya tek örneklem için parametrik olmayan test</div>
+      <div id="info-wilcoxon"></div>
+      <div class="card">
+        <div class="card-header"><span class="icon">⚙️</span> Analiz Ayarları</div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-md-3">
+              <label class="form-label">1. Değişken</label>
+              <select class="form-select" id="wil-v1"></select>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">2. Değişken <small class="text-muted">(boş = tek örneklem)</small></label>
+              <select class="form-select" id="wil-v2"></select>
+            </div>
+            <div class="col-md-2">
+              <label class="form-label">Test Değeri (μ₀)</label>
+              <input type="number" class="form-control" id="wil-mu" value="3" step="0.5">
+            </div>
+            <div class="col-md-4 d-flex align-items-end">
+              <button class="btn-run w-100" onclick="runWilcoxon()"><i class="fa fa-play"></i> Analiz Et</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="spinner" id="wil-spin"><div class="lds-ring"><div></div><div></div><div></div></div></div>
+      <div class="result-wrap" id="wil-result"></div>
+    </div>
+
+    <!-- ╔══════════════════ PANEL: ANOVA ══════════════════╗ -->
+    <div class="panel" id="panel-anova">
+      <div class="section-title">📊 Tek Yönlü ANOVA</div>
+      <div class="section-sub">İkiden fazla bağımsız grup arasındaki ortalama farklarını test eder (+ Bonferroni post-hoc)</div>
+      <div id="info-anova"></div>
+      <div class="card">
+        <div class="card-header"><span class="icon">⚙️</span> Analiz Ayarları</div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-md-4">
+              <label class="form-label">Grup Değişkeni</label>
+              <select class="form-select" id="anova-grp"></select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Bağımlı Değişken (sayısal)</label>
+              <select class="form-select" id="anova-var"></select>
+            </div>
+            <div class="col-md-4 d-flex align-items-end">
+              <button class="btn-run w-100" onclick="runAnova()"><i class="fa fa-play"></i> Analiz Et</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="spinner" id="anova-spin"><div class="lds-ring"><div></div><div></div><div></div></div></div>
+      <div class="result-wrap" id="anova-result"></div>
+    </div>
+
+    <!-- ╔══════════════════ PANEL: KRUSKAL ══════════════════╗ -->
+    <div class="panel" id="panel-kruskal">
+      <div class="section-title">📉 Kruskal-Wallis Testi</div>
+      <div class="section-sub">ANOVA'nın parametrik olmayan alternatifi (+ Mann-Whitney post-hoc)</div>
+      <div id="info-kruskal"></div>
+      <div class="card">
+        <div class="card-header"><span class="icon">⚙️</span> Analiz Ayarları</div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-md-4">
+              <label class="form-label">Grup Değişkeni</label>
+              <select class="form-select" id="kw-grp"></select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Bağımlı Değişken (sayısal)</label>
+              <select class="form-select" id="kw-var"></select>
+            </div>
+            <div class="col-md-4 d-flex align-items-end">
+              <button class="btn-run w-100" onclick="runKruskal()"><i class="fa fa-play"></i> Analiz Et</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="spinner" id="kw-spin"><div class="lds-ring"><div></div><div></div><div></div></div></div>
+      <div class="result-wrap" id="kw-result"></div>
+    </div>
+
+    <!-- ╔══════════════════ PANEL: CORRELATION ══════════════════╗ -->
+    <div class="panel" id="panel-correlation">
+      <div class="section-title">🔗 Korelasyon Analizi</div>
+      <div class="section-sub">İki sayısal değişken arasındaki doğrusal ilişkinin yönü ve gücü</div>
+      <div id="info-correlation"></div>
+      <div class="card">
+        <div class="card-header"><span class="icon">⚙️</span> Analiz Ayarları</div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-md-3">
+              <label class="form-label">1. Değişken</label>
+              <select class="form-select" id="corr-v1"></select>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">2. Değişken</label>
+              <select class="form-select" id="corr-v2"></select>
+            </div>
+            <div class="col-md-2">
+              <label class="form-label">Yöntem</label>
+              <select class="form-select" id="corr-method">
+                <option value="pearson">Pearson (r)</option>
+                <option value="spearman">Spearman (ρ)</option>
+              </select>
+            </div>
+            <div class="col-md-2">
+              <label class="form-label">Renklendirme</label>
+              <select class="form-select" id="corr-grp"></select>
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+              <button class="btn-run w-100" onclick="runCorr()"><i class="fa fa-play"></i> Analiz Et</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="spinner" id="corr-spin"><div class="lds-ring"><div></div><div></div><div></div></div></div>
+      <div class="result-wrap" id="corr-result"></div>
+    </div>
+
+    <!-- ╔══════════════════ PANEL: CORR MATRIX ══════════════════╗ -->
+    <div class="panel" id="panel-corrmatrix">
+      <div class="section-title">🟦 Korelasyon Matrisi</div>
+      <div class="section-sub">Birden fazla değişken arasındaki tüm ikili korelasyonlar</div>
+      <div id="info-corrmatrix"></div>
+      <div class="card">
+        <div class="card-header"><span class="icon">⚙️</span> Analiz Ayarları</div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-md-9">
+              <label class="form-label">Dahil edilecek değişkenler</label>
+              <div class="var-check-grid" id="cm-vars"></div>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Yöntem</label>
+              <select class="form-select mb-3" id="cm-method">
+                <option value="pearson">Pearson</option>
+                <option value="spearman">Spearman</option>
+              </select>
+              <button class="btn-run w-100" onclick="runCorrMatrix()"><i class="fa fa-play"></i> Analiz Et</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="spinner" id="cm-spin"><div class="lds-ring"><div></div><div></div><div></div></div></div>
+      <div class="result-wrap" id="cm-result"></div>
+    </div>
+
+    <!-- ╔══════════════════ PANEL: RELIABILITY ══════════════════╗ -->
+    <div class="panel" id="panel-reliability">
+      <div class="section-title">🎯 Güvenilirlik Analizi</div>
+      <div class="section-sub">Cronbach's alpha ile iç tutarlılık ve madde analizi</div>
+      <div id="info-reliability"></div>
+      <div class="card">
+        <div class="card-header"><span class="icon">⚙️</span> Analiz Ayarları</div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-md-8">
+              <label class="form-label">Alt Boyut / Ölçek</label>
+              <select class="form-select" id="rel-sub"></select>
+            </div>
+            <div class="col-md-4 d-flex align-items-end">
+              <button class="btn-run w-100" onclick="runReliability()"><i class="fa fa-play"></i> Analiz Et</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="spinner" id="rel-spin"><div class="lds-ring"><div></div><div></div><div></div></div></div>
+      <div class="result-wrap" id="rel-result"></div>
+    </div>
+
+    <!-- ╔══════════════════ PANEL: SUBSCALE ══════════════════╗ -->
+    <div class="panel" id="panel-subscale">
+      <div class="section-title">🕸️ Alt Boyut Karşılaştırması</div>
+      <div class="section-sub">F1–F6 alt boyutlarının çubuk ve radar grafiğiyle görselleştirilmesi</div>
+      <div id="info-subscale"></div>
+      <div class="card">
+        <div class="card-header"><span class="icon">⚙️</span> Analiz Ayarları</div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-md-8">
+              <label class="form-label">Gruplama Değişkeni <small class="text-muted">(isteğe bağlı)</small></label>
+              <select class="form-select" id="sub-grp"></select>
+            </div>
+            <div class="col-md-4 d-flex align-items-end">
+              <button class="btn-run w-100" onclick="runSubscale()"><i class="fa fa-play"></i> Analiz Et</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="spinner" id="sub-spin"><div class="lds-ring"><div></div><div></div><div></div></div></div>
+      <div class="result-wrap" id="sub-result"></div>
+    </div>
+
+  </div><!-- /content -->
+</div><!-- /main -->
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+// ════════════════════════════════════════════════════════════════
+// TEST AÇIKLAMALARI — Formül + Ne zaman kullanılır
+// ════════════════════════════════════════════════════════════════
+const TEST_INFO = {
+  overview: null,
+  descriptive: {
+    title:'Tanımlayıcı İstatistikler',
+    icon:'📈',
+    when:'Bir değişkenin dağılımını, merkezi eğilimini ve yayılımını özetlemek için kullanılır.',
+    formulas:[
+      {name:'Ortalama (x̄)',     f:'x̄ = (Σxᵢ) / n'},
+      {name:'Standart Sapma',   f:'s = √[ Σ(xᵢ−x̄)² / (n−1) ]'},
+      {name:'Standart Hata',    f:'SH = s / √n'},
+      {name:'Çarpıklık',        f:'g₁ = [n/((n−1)(n−2))] × Σ((xᵢ−x̄)/s)³'},
+    ],
+    assumptions:['Veri en az sıralı ölçek düzeyinde olmalı'],
+    note:'Çarpıklık |g₁|>1 ise güçlü çarpıklık; basıklık >3 ise sivri dağılım.'
+  },
+  normality:{
+    title:'Normallik Testi',
+    icon:'📐',
+    when:'İstatistiksel testlerin varsayımını kontrol etmek için uygulanır. Parametrik testler önce normallik gerektirir.',
+    formulas:[
+      {name:'Shapiro-Wilk (W)', f:'W = (Σ aᵢ x₍ᵢ₎)² / Σ(xᵢ − x̄)²'},
+      {name:'Kolmogorov-Smirnov', f:'D = max|Fn(x) − F₀(x)|'},
+    ],
+    assumptions:['n ≤ 5000 için Shapiro-Wilk tercih edilir'],
+    note:'p > 0.05 → Normal dağılım reddedilemez. p < 0.05 → Normal dağılımdan sapma var.'
+  },
+  chisquare:{
+    title:'Ki-Kare Bağımsızlık Testi (χ²)',
+    icon:'🔲',
+    when:'İki kategorik değişken arasında istatistiksel olarak anlamlı bir ilişki olup olmadığını test eder.',
+    formulas:[
+      {name:'Ki-Kare',           f:"χ² = Σ (O − E)² / E"},
+      {name:'Beklenen Frekans',  f:'E = (Satır toplamı × Sütun toplamı) / Genel toplam'},
+      {name:"Cramér's V",        f:"V = √[ χ² / (n × (min(r,c) − 1)) ]"},
+    ],
+    assumptions:['Her hücredeki beklenen frekans ≥ 5 olmalı (tercih edilen)','Gözlemler birbirinden bağımsız'],
+    note:"Cramér's V: <0.1 önemsiz · 0.1–0.3 küçük · 0.3–0.5 orta · >0.5 büyük etki"
+  },
+  chisquare_sorular:{
+    title:'Soru Bazlı Ki-Kare (Toplu / Tekli)',
+    icon:'📋',
+    when:'32 maddenin her birini bir demografik değişkenle ayrı ayrı test ederek hangi soruların gruplar arasında farklılaştığını gösterir.',
+    formulas:[
+      {name:'Ki-Kare',  f:"χ² = Σ (O − E)² / E"},
+      {name:"Cramér's V", f:"V = √[ χ² / (n × (min(r,c) − 1)) ]"},
+    ],
+    assumptions:['Likert puanları (1–5) kategorik değişken olarak işlenir'],
+    note:'Bonferroni düzeltmesi uygulanmamıştır — çoklu karşılaştırma nedeniyle tip-I hata riski göz önünde bulundurulmalıdır.'
+  },
+  ttest:{
+    title:'Bağımsız Örneklem t-Testi',
+    icon:'⚖️',
+    when:'İki bağımsız grubun popülasyon ortalamalarının eşit olup olmadığını test eder.',
+    formulas:[
+      {name:'t istatistiği',    f:'t = (x̄₁ − x̄₂) / √(s₁²/n₁ + s₂²/n₂)'},
+      {name:"Cohen's d",        f:"d = (x̄₁ − x̄₂) / s_havuz"},
+      {name:'Levene Testi',     f:'F = (n₁−1)s₁² + ... (varyans eşitliği için)'},
+    ],
+    assumptions:['Her iki grup normal dağılımlı','Varyanslar eşit (Levene p>0.05) → Student; eşit değil → Welch t','Gözlemler bağımsız'],
+    note:"Cohen's d: <0.2 önemsiz · 0.2–0.5 küçük · 0.5–0.8 orta · >0.8 büyük"
+  },
+  mannwhitney:{
+    title:'Mann-Whitney U Testi',
+    icon:'🔀',
+    when:'T-testinin parametrik olmayan alternatifi. Normallik varsayımı sağlanamadığında iki bağımsız grubun dağılımlarını karşılaştırır.',
+    formulas:[
+      {name:'U istatistiği', f:'U₁ = n₁n₂ + n₁(n₁+1)/2 − R₁'},
+      {name:'r etki',        f:'r = |Z| / √n'},
+    ],
+    assumptions:['Bağımsız gözlemler','Sıralı veya sürekli değişken'],
+    note:'r: <0.1 önemsiz · 0.1–0.3 küçük · 0.3–0.5 orta · >0.5 büyük'
+  },
+  wilcoxon:{
+    title:'Wilcoxon İşaretli Sıra Testi',
+    icon:'🔁',
+    when:'Eşleştirilmiş iki ölçümün farkının 0\'dan farklı olup olmadığını sınar. Eşleştirilmiş t-testinin parametrik olmayan alternatifi.',
+    formulas:[
+      {name:'W istatistiği', f:'W = Σ [ sgn(xᵢ − μ₀) × Rᵢ ]'},
+      {name:'r etki',        f:'r = |Z| / √n'},
+    ],
+    assumptions:['Farkların dağılımı simetrik olmalı','Bağımlı (eşleştirilmiş) gözlemler','Sıfır farklar analizden çıkarılır'],
+    note:'Tek örneklem modunda: H₀: medyan = μ₀. Eşleştirilmiş modda: H₀: medyan(v1−v2) = 0'
+  },
+  anova:{
+    title:'Tek Yönlü ANOVA (Analysis of Variance)',
+    icon:'📊',
+    when:'Üç veya daha fazla bağımsız grubun ortalamalarını aynı anda karşılaştırır. Anlamlıysa Bonferroni post-hoc uygulanır.',
+    formulas:[
+      {name:'F istatistiği',  f:'F = MS_gruplar_arası / MS_gruplar_içi'},
+      {name:'MS_gruplar_arası', f:'= SS_B / (k−1)'},
+      {name:'Eta-kare (η²)',  f:'η² = SS_B / SS_toplam'},
+    ],
+    assumptions:['Her grup normal dağılımlı (Shapiro-Wilk)','Varyanslar eşit (Levene)','Bağımsız gözlemler'],
+    note:'η²: <0.01 önemsiz · 0.01–0.06 küçük · 0.06–0.14 orta · >0.14 büyük'
+  },
+  kruskal:{
+    title:'Kruskal-Wallis Testi',
+    icon:'📉',
+    when:"ANOVA'nın parametrik olmayan alternatifi. Normallik ya da varyans homojenliği sağlanamadığında tercih edilir.",
+    formulas:[
+      {name:'H istatistiği',  f:'H = [12 / (n(n+1))] × Σ(Rⱼ² / nⱼ) − 3(n+1)'},
+      {name:'ε² etki',        f:'ε² = H / (n − 1)'},
+    ],
+    assumptions:['Bağımsız gözlemler','Sıralı veya sürekli değişken'],
+    note:'Post-hoc: pairwise Mann-Whitney + Bonferroni düzeltmesi'
+  },
+  correlation:{
+    title:'Korelasyon Analizi',
+    icon:'🔗',
+    when:'İki sayısal değişken arasındaki doğrusal (Pearson) veya monoton (Spearman) ilişkinin yönünü ve gücünü ölçer.',
+    formulas:[
+      {name:'Pearson r',   f:'r = Σ(xᵢ−x̄)(yᵢ−ȳ) / √[Σ(xᵢ−x̄)² · Σ(yᵢ−ȳ)²]'},
+      {name:'Spearman ρ',  f:'ρ = 1 − [6Σdᵢ²] / [n(n²−1)]'},
+      {name:'%95 GA',      f:'tanh(arctanh(r) ± 1.96/√(n−3))'},
+    ],
+    assumptions:['Pearson: normallik + doğrusal ilişki','Spearman: monoton ilişki, normallik gerekmez'],
+    note:'|r|: <0.1 önemsiz · 0.1–0.3 zayıf · 0.3–0.5 orta · >0.5 güçlü'
+  },
+  corrmatrix:{
+    title:'Korelasyon Matrisi',
+    icon:'🟦',
+    when:'Birden fazla değişken arasındaki tüm ikili korelasyonları tek bir görünümde sunar.',
+    formulas:[{name:'Her hücre', f:'r veya ρ (Pearson / Spearman)'}],
+    assumptions:['Pearson için normallik tercih edilir'],
+    note:'* p<0.05  ** p<0.01  *** p<0.001 — yıldız anlamlılığı gösterir'
+  },
+  reliability:{
+    title:"Cronbach's Alpha — Güvenilirlik Analizi",
+    icon:'🎯',
+    when:"Bir ölçeğin iç tutarlılığını (güvenilirliğini) ölçer. Maddelerin aynı yapıyı ölçüp ölçmediğini değerlendirir.",
+    formulas:[
+      {name:"Cronbach's α",    f:'α = [k/(k−1)] × [1 − ΣSᵢ² / S²_toplam]'},
+      {name:'Madde-Toplam r', f:'rᵢₜ = Pearson(Xᵢ, X_toplam)'},
+    ],
+    assumptions:['Maddeler aynı yapıyı ölçmeli (tek boyutluluk)','En az sıralı ölçek düzeyi'],
+    note:'α: <0.60 zayıf · 0.60–0.70 şüpheli · 0.70–0.80 kabul edilebilir · 0.80–0.90 iyi · ≥0.90 mükemmel'
+  },
+  subscale:{
+    title:'Alt Boyut Karşılaştırması',
+    icon:'🕸️',
+    when:'F1–F6 alt boyut ortalamalarını genel veya grup bazında görselleştirir.',
+    formulas:[{name:'Alt boyut puanı', f:'F = mean(ilgili maddeler)'}],
+    assumptions:['5\'li Likert ölçek (1=Kesinlikle Katılmıyorum … 5=Kesinlikle Katılıyorum)'],
+    note:'Radar grafiği değerleri 0–5 aralığında gösterilir. Orta nokta = 3.'
+  },
+};
+
+function renderInfoCard(panelId){
+  const info = TEST_INFO[panelId];
+  const el = document.getElementById('info-' + panelId);
+  if(!el || !info) return;
+  const formulaHtml = info.formulas.map(f=>
+    `<div class="info-row"><b>${f.name}:</b><div class="formula">${f.f}</div></div>`
+  ).join('');
+  const assumptionsHtml = info.assumptions.map(a=>`<span class="tag">${a}</span>`).join('');
+  el.innerHTML = `
+    <div class="info-toggle" onclick="this.nextElementSibling.classList.toggle('d-none');this.querySelector('.chevron').classList.toggle('fa-chevron-down');this.querySelector('.chevron').classList.toggle('fa-chevron-up')">
+      <i class="fa fa-circle-info" style="color:#0369a1"></i>
+      <span>${info.icon} ${info.title} — Test Hakkında</span>
+      <i class="fa fa-chevron-down chevron ms-auto" style="font-size:.75rem;color:#64748b"></i>
+    </div>
+    <div class="info-card d-none">
+      <div class="info-row"><b>📌 Ne zaman kullanılır?</b><br>${info.when}</div>
+      <div class="mt-2"><b>🧮 Formül:</b>${formulaHtml}</div>
+      <div class="mt-2"><b>✅ Varsayımlar:</b><br>${assumptionsHtml}</div>
+      ${info.note ? `<div class="info-row mt-2"><b>💡 Not:</b> ${info.note}</div>` : ''}
+    </div>`;
+}
+
+// ════════════════════════════════════════════════════════════════
+// State & Helpers
+// ════════════════════════════════════════════════════════════════
+let INFO = {};
+const CAT  = ['Yaş','Cinsiyet','Fakülte','Bölüm','Sınıf'];
+const SUB  = ['F1: Ayrımcılık & Toksisite','F2: Bilgi Tehlikeleri',
+              'F3: Yanlış Bilginin Zararı','F4: Kötüye Kullanımlar',
+              'F5: İnsan-Bilgisayar Etkileşim','F6: Otomasyon & Çevre Zararları'];
+
+function show(id, el){
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-item a').forEach(a=>a.classList.remove('active'));
+  document.getElementById('panel-'+id).classList.add('active');
+  const anchor = el || (typeof event !== 'undefined' && event && event.currentTarget) ||
+                 document.querySelector(`.nav-item a[onclick*="'${id}'"]`);
+  if(anchor) anchor.classList.add('active');
+  if(id==='overview') loadOverview();
+  renderInfoCard(id);
+}
+
+function spin(id,on){
+  const el=document.getElementById(id+'-spin');
+  if(el) el.classList.toggle('show',on);
+}
+function resWrap(id,on){
+  const el=document.getElementById(id+'-result');
+  if(el) el.classList.toggle('show',on);
+  return el;
+}
+
+async function post(url,body){
+  const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  if(!r.ok){const e=await r.json();throw new Error(e.error||'Sunucu hatası');}
+  return r.json();
+}
+
+function chart(data,divId){
+  const fig = JSON.parse(JSON.stringify(data));
+  const layout = Object.assign({margin:{t:50,b:40,l:50,r:30},font:{family:'Segoe UI,system-ui,sans-serif',size:12}},fig.layout||{});
+  Plotly.newPlot(divId, fig.data||[], layout, {responsive:true,displayModeBar:true,modeBarButtonsToRemove:['lasso2d','select2d']});
+}
+
+function sigBadgeClass(p){ return p < 0.05 ? 'bg-success' : 'bg-secondary'; }
+
+function statGrid(items){
+  return '<div class="stat-grid">'+items.map(i=>`
+    <div class="stat-box ${i.cls||''}">
+      <div class="val">${i.val}</div>
+      <div class="lbl">${i.lbl}</div>
+    </div>`).join('')+'</div>';
+}
+
+function tableFromRows(headers, rows, highlightFn){
+  const ths = headers.map(h=>`<th>${h}</th>`).join('');
+  const trs = rows.map(r=>{
+    const cls = highlightFn && highlightFn(r) ? ' class="sig-row"' : '';
+    const tds = headers.map(h=>`<td>${r[h]??r[headers.indexOf(h)]??''}</td>`).join('');
+    return `<tr${cls}>${tds}</tr>`;
+  }).join('');
+  return `<div class="table-wrap"><table class="table table-sm table-striped table-bordered">
+    <thead><tr>${ths}</tr></thead><tbody>${trs}</tbody></table></div>`;
+}
+
+// ════════════════════════════════════════════════════════════════
+// Init — veri bilgisi çek, dropdown'ları doldur
+// ════════════════════════════════════════════════════════════════
+async function init(){
+  try{
+    INFO = await fetch('/api/info').then(r=>r.json());
+    populateDropdowns();
+    loadOverview();
+    // İlk nav öğesini aktif et
+    document.querySelector('.nav-item a').classList.add('active');
+  }catch(e){console.error(e);}
+}
+
+function fillSelect(selId, options, withNone=false, noneLabel='— Seçiniz —'){
+  const sel = document.getElementById(selId);
+  if(!sel) return;
+  sel.innerHTML = '';
+  if(withNone) sel.innerHTML = `<option value="none">${noneLabel}</option>`;
+  options.forEach(o=>sel.insertAdjacentHTML('beforeend',`<option value="${o}">${o}</option>`));
+}
+
+function populateDropdowns(){
+  const nums = INFO.num_cols || [];
+  const cats = INFO.cat_cols || [];
+  const subs = INFO.subscale_cols || [];
+
+  // descriptive
+  fillSelect('desc-var', nums);
+  fillSelect('desc-grp', cats, true, '— Gruplama yok —');
+  // normality
+  fillSelect('norm-var', nums);
+  // chi-square
+  fillSelect('chi-v1', cats);
+  fillSelect('chi-v2', cats);
+  // t-test
+  fillSelect('tt-grp', cats.filter(c=>{ const vc=INFO.demographics[c]; return vc && vc.labels.length===2;}));
+  fillSelect('tt-var', nums);
+  // mann-whitney
+  fillSelect('mw-grp', cats.filter(c=>{ const vc=INFO.demographics[c]; return vc && vc.labels.length===2;}));
+  fillSelect('mw-var', nums);
+  // anova
+  fillSelect('anova-grp', cats);
+  fillSelect('anova-var', nums);
+  // kruskal
+  fillSelect('kw-grp', cats);
+  fillSelect('kw-var', nums);
+  // correlation
+  fillSelect('corr-v1', nums);
+  fillSelect('corr-v2', nums);
+  fillSelect('corr-grp', cats, true, '— Renklendirme yok —');
+  // corr matrix checkboxes
+  const cmDiv = document.getElementById('cm-vars');
+  [...subs,'Etik Farkındalık','Sosyal Risk Farkındalığı','Genel Farkındalık'].forEach(v=>{
+    const id = 'cm_'+v.replace(/\W/g,'_');
+    cmDiv.insertAdjacentHTML('beforeend',`
+      <div class="form-check">
+        <input class="form-check-input" type="checkbox" id="${id}" value="${v}" checked>
+        <label class="form-check-label" for="${id}" style="font-size:.78rem">${v}</label>
+      </div>`);
+  });
+  // wilcoxon
+  fillSelect('wil-v1', nums);
+  fillSelect('wil-v2', nums, true, '— Tek örneklem (v1 - mu0) —');
+
+  // chisquare_sorular
+  fillSelect('csq-grp', cats);
+  const csqSoru = document.getElementById('csq-soru');
+  csqSoru.innerHTML = '<option value="">— Tüm 32 soru (toplu) —</option>';
+  for(let i=1;i<=32;i++) csqSoru.insertAdjacentHTML('beforeend',`<option value="Soru${i}">Soru ${i}</option>`);
+
+  // reliability
+  const relSel = document.getElementById('rel-sub');
+  relSel.innerHTML = '';
+  ['Tümü (32 madde)',...subs].forEach(s=>relSel.insertAdjacentHTML('beforeend',`<option value="${s}">${s}</option>`));
+  // subscale
+  fillSelect('sub-grp', cats, true, '— Gruplama yok —');
+}
+
+// ════════════════════════════════════════════════════════════════
+// OVERVIEW
+// ════════════════════════════════════════════════════════════════
+async function loadOverview(){
+  const wrap = document.getElementById('overview-chart');
+  if(INFO.chart){
+    wrap.innerHTML='<div id="ov-chart" style="width:100%;height:540px;"></div>';
+    chart(INFO.chart,'ov-chart');
+  }
+}
+
+// ════════════════════════════════════════════════════════════════
+// DESCRIPTIVE
+// ════════════════════════════════════════════════════════════════
+async function runDescriptive(){
+  spin('desc',true); resWrap('desc',false);
+  try{
+    const d = await post('/api/descriptive',{
+      variable: document.getElementById('desc-var').value,
+      group_by: document.getElementById('desc-grp').value
+    });
+    spin('desc',false);
+    const el = resWrap('desc',true);
+    if(d.type==='single'){
+      const s = d.stats;
+      el.innerHTML = `
+        ${statGrid([
+          {val:s.n,lbl:'n'},{val:s.mean,lbl:'Ortalama'},{val:s.std,lbl:'SS'},
+          {val:s.sem,lbl:'SH'},{val:s.median,lbl:'Medyan'},
+          {val:s.min+' – '+s.max,lbl:'Min – Max'},
+          {val:s.q1+' – '+s.q3,lbl:'Q1 – Q3'},
+          {val:s.skew,lbl:'Çarpıklık'},{val:s.kurt,lbl:'Basıklık'},
+        ])}
+        <div id="desc-chart" class="chart-wrap" style="height:380px;"></div>`;
+    } else {
+      const rows = Object.entries(d.stats).map(([g,s])=>({
+        'Grup':g,'n':s.n,'Ort.':s.mean,'SS':s.std,'Min':s.min,'Max':s.max,'Medyan':s.median
+      }));
+      el.innerHTML = tableFromRows(['Grup','n','Ort.','SS','Min','Max','Medyan'],rows)
+                   + '<div id="desc-chart" class="chart-wrap" style="height:420px;"></div>';
+    }
+    chart(d.chart,'desc-chart');
+  }catch(e){spin('desc',false);alert('Hata: '+e.message);}
+}
+
+// ════════════════════════════════════════════════════════════════
+// NORMALITY
+// ════════════════════════════════════════════════════════════════
+async function runNormality(){
+  spin('norm',true); resWrap('norm',false);
+  try{
+    const d = await post('/api/normality',{variable:document.getElementById('norm-var').value});
+    spin('norm',false);
+    const el = resWrap('norm',true);
+    const rows = d.rows.map(r=>({'Test':r.test,'İstatistik':r.stat,'p':r.p,'Karar':r.karar}));
+    el.innerHTML = `
+      ${statGrid([
+        {val:d.skew,lbl:'Çarpıklık'},{val:d.kurt,lbl:'Basıklık'},
+        {val:d.is_normal?'✅ Normal':'❌ Normal Değil',lbl:'Karar',cls:d.is_normal?'sig':'nsig'}
+      ])}
+      <div class="interpretation">${d.interpretation}</div>
+      ${tableFromRows(['Test','İstatistik','p','Karar'],rows)}
+      <div id="norm-chart" class="chart-wrap" style="height:400px;"></div>`;
+    chart(d.chart,'norm-chart');
+  }catch(e){spin('norm',false);alert('Hata: '+e.message);}
+}
+
+
+// ════════════════════════════════════════════════════════════════
+// WILCOXON
+// ════════════════════════════════════════════════════════════════
+async function runWilcoxon(){
+  spin('wil',true); resWrap('wil',false);
+  const v2val = document.getElementById('wil-v2').value;
+  try{
+    const d = await post('/api/wilcoxon',{
+      var1: document.getElementById('wil-v1').value,
+      var2: (v2val && v2val!=='none') ? v2val : null,
+      mu:   parseFloat(document.getElementById('wil-mu').value)||0
+    });
+    spin('wil',false);
+    const el = resWrap('wil',true);
+    el.innerHTML = statGrid([
+        {val:d.W,      lbl:'W istatistiği'},
+        {val:d.p,      lbl:'p değeri'},
+        {val:d.stars,  lbl:'Anlamlılık'},
+        {val:d.n,      lbl:'n (geçerli fark)'},
+        {val:d.r,      lbl:'r (etki)'},
+        {val:d.effect, lbl:'Etki Büyüklüğü', cls:d.significant?'sig':'nsig'},
+        {val:d.pos,    lbl:'+ Fark'},
+        {val:d.neg,    lbl:'− Fark'},
+        {val:d.zero,   lbl:'Sıfır Fark'},
+      ])
+      + `<div class="interpretation">${d.interpretation}</div>`
+      + `<div id="wil-chart" class="chart-wrap" style="height:440px;"></div>`;
+    chart(d.chart,'wil-chart');
+  }catch(e){spin('wil',false);alert('Hata: '+e.message);}
+}
+// ════════════════════════════════════════════════════════════════
+// CHI-SQUARE SORULAR (toplu + tekli)
+// ════════════════════════════════════════════════════════════════
+async function runChisquareSorular(){
+  spin('csq',true); resWrap('csq',false);
+  const gvar  = document.getElementById('csq-grp').value;
+  const soru  = document.getElementById('csq-soru').value || null;
+  try{
+    const d = await post('/api/chisquare_sorular', {group_var: gvar, soru: soru});
+    spin('csq',false);
+    const el = resWrap('csq',true);
+
+    if(soru){
+      // Tekli soru sonucu
+      el.innerHTML = `
+        ${statGrid([
+          {val:d.chi2,       lbl:'χ²'},
+          {val:d.df,         lbl:'df'},
+          {val:d.p,          lbl:'p değeri'},
+          {val:d.stars,      lbl:'Anlamlılık'},
+          {val:d.cramers_v,  lbl:"Cramér's V"},
+          {val:d.effect,     lbl:'Etki Büyüklüğü', cls: d.significant?'sig':'nsig'},
+        ])}
+        <div class="interpretation">${d.interpretation}</div>
+        <div class="mt-2"><b>Çapraz Tablo (gözlenen frekans):</b>${d.ct_html}</div>
+        <div id="csq-chart" class="chart-wrap" style="height:440px;"></div>`;
+      chart(d.chart,'csq-chart');
+    } else {
+      // Toplu analiz sonucu
+      const rows = d.results.map(r=>({
+        'Soru': r.soru,
+        'χ²':   r.chi2,
+        'df':   r.df,
+        'p':    r.p,
+        "V":    r.cramers_v,
+        'Etki': r.effect,
+        'Sig':  r.significant ? `✅ ${r.stars}` : '–',
+        'Not':  r.low_exp > 0 ? `⚠️ ${r.low_exp} hücre` : '✅'
+      }));
+      el.innerHTML = `
+        ${statGrid([
+          {val: d.n_sig,    lbl:'Anlamlı Soru',   cls:'sig'},
+          {val: d.n_total,  lbl:'Toplam Soru'},
+          {val: d.n_total - d.n_sig, lbl:'Anlamlı Değil', cls:'nsig'},
+        ])}
+        <div class="interpretation">${d.interpretation}</div>
+        ${tableFromRows(['Soru','χ²','df','p','V','Etki','Sig','Not'], rows, r=>r['Sig'].startsWith('✅'))}
+        <div id="csq-chart" class="chart-wrap" style="height:640px;"></div>`;
+      chart(d.chart,'csq-chart');
+    }
+  }catch(e){spin('csq',false);alert('Hata: '+e.message);}
+}
+
+// ════════════════════════════════════════════════════════════════
+// CHI-SQUARE
+// ════════════════════════════════════════════════════════════════
+async function runChisquare(){
+  spin('chi',true); resWrap('chi',false);
+  try{
+    const d = await post('/api/chisquare',{
+      var1:document.getElementById('chi-v1').value,
+      var2:document.getElementById('chi-v2').value
+    });
+    spin('chi',false);
+    const el = resWrap('chi',true);
+    el.innerHTML = `
+      ${statGrid([
+        {val:d.chi2,lbl:'χ²'},{val:d.df,lbl:'df'},{val:d.p,lbl:'p değeri'},
+        {val:d.stars,lbl:'Anlamlılık'},{val:d.cramers_v,lbl:"Cramér's V"},
+        {val:d.effect,lbl:'Etki Büyüklüğü',cls:d.significant?'sig':'nsig'}
+      ])}
+      <div class="interpretation">${d.interpretation}</div>
+      <div class="mt-3"><b>Çapraz Tablo:</b>${d.ct_html}</div>
+      <div id="chi-chart" class="chart-wrap" style="height:420px;"></div>`;
+    chart(d.chart,'chi-chart');
+  }catch(e){spin('chi',false);alert('Hata: '+e.message);}
+}
+
+// ════════════════════════════════════════════════════════════════
+// T-TEST
+// ════════════════════════════════════════════════════════════════
+async function runTtest(){
+  spin('tt',true); resWrap('tt',false);
+  try{
+    const d = await post('/api/ttest',{
+      group_var:document.getElementById('tt-grp').value,
+      value_var:document.getElementById('tt-var').value
+    });
+    spin('tt',false);
+    const el = resWrap('tt',true);
+    const gRows = d.groups.map(g=>({'Grup':g.name,'n':g.n,'Ortalama':g.mean,'SS':g.std}));
+    el.innerHTML = `
+      ${statGrid([
+        {val:d.t,lbl:'t istatistiği'},{val:d.p,lbl:'p değeri'},
+        {val:d.stars,lbl:'Anlamlılık'},{val:d.d,lbl:"Cohen's d"},
+        {val:d.effect,lbl:'Etki Büyüklüğü',cls:d.significant?'sig':'nsig'},
+        {val:'['+d.ci.join(', ')+']',lbl:'%95 GA (fark)'},
+        {val:d.levene_p,lbl:'Levene p'},
+        {val:d.equal_var?'Eşit ✅':'Eşit Değil ⚠️',lbl:'Varyanslar'}
+      ])}
+      <div class="interpretation">${d.interpretation}</div>
+      ${tableFromRows(['Grup','n','Ortalama','SS'],gRows)}
+      <div id="tt-chart" class="chart-wrap" style="height:420px;"></div>`;
+    chart(d.chart,'tt-chart');
+  }catch(e){spin('tt',false);alert('Hata: '+e.message);}
+}
+
+// ════════════════════════════════════════════════════════════════
+// MANN-WHITNEY
+// ════════════════════════════════════════════════════════════════
+async function runMW(){
+  spin('mw',true); resWrap('mw',false);
+  try{
+    const d = await post('/api/mannwhitney',{
+      group_var:document.getElementById('mw-grp').value,
+      value_var:document.getElementById('mw-var').value
+    });
+    spin('mw',false);
+    const el = resWrap('mw',true);
+    const gRows = d.groups.map(g=>({'Grup':g.name,'n':g.n,'Medyan':g.median,'Ortalama':g.mean}));
+    el.innerHTML = `
+      ${statGrid([
+        {val:d.U,lbl:'U istatistiği'},{val:d.p,lbl:'p değeri'},
+        {val:d.stars,lbl:'Anlamlılık'},{val:d.r,lbl:'r (etki)'},
+        {val:d.effect,lbl:'Etki Büyüklüğü',cls:d.significant?'sig':'nsig'}
+      ])}
+      <div class="interpretation">${d.interpretation}</div>
+      ${tableFromRows(['Grup','n','Medyan','Ortalama'],gRows)}
+      <div id="mw-chart" class="chart-wrap" style="height:400px;"></div>`;
+    chart(d.chart,'mw-chart');
+  }catch(e){spin('mw',false);alert('Hata: '+e.message);}
+}
+
+// ════════════════════════════════════════════════════════════════
+// ANOVA
+// ════════════════════════════════════════════════════════════════
+async function runAnova(){
+  spin('anova',true); resWrap('anova',false);
+  try{
+    const d = await post('/api/anova',{
+      group_var:document.getElementById('anova-grp').value,
+      value_var:document.getElementById('anova-var').value
+    });
+    spin('anova',false);
+    const el = resWrap('anova',true);
+    const gRows = d.groups.map(g=>({'Grup':g.name,'n':g.n,'Ortalama':g.mean,'SS':g.std}));
+    const phRows = d.posthoc.map(p=>({'G1':p.g1,'G2':p.g2,'t':p.t,'p_ham':p.p_raw,'p_bonf':p.p_bonf,'Sig':p.sig?'✅ Anlamlı':'–'}));
+    el.innerHTML = `
+      ${statGrid([
+        {val:d.F,lbl:'F istatistiği'},{val:d.p,lbl:'p değeri'},
+        {val:d.stars,lbl:'Anlamlılık'},{val:d.eta2,lbl:'η² (etki)'},
+        {val:d.effect,lbl:'Etki Büyüklüğü',cls:d.significant?'sig':'nsig'}
+      ])}
+      <div class="interpretation">${d.interpretation}</div>
+      <div class="row g-3 mt-1">
+        <div class="col-md-6"><b>Grup İstatistikleri:</b>${tableFromRows(['Grup','n','Ortalama','SS'],gRows)}</div>
+        <div class="col-md-6"><b>Post-hoc (Bonferroni):</b>${tableFromRows(['G1','G2','t','p_ham','p_bonf','Sig'],phRows,r=>r['Sig'].startsWith('✅'))}</div>
+      </div>
+      <div id="anova-chart" class="chart-wrap" style="height:420px;"></div>`;
+    chart(d.chart,'anova-chart');
+  }catch(e){spin('anova',false);alert('Hata: '+e.message);}
+}
+
+// ════════════════════════════════════════════════════════════════
+// KRUSKAL
+// ════════════════════════════════════════════════════════════════
+async function runKruskal(){
+  spin('kw',true); resWrap('kw',false);
+  try{
+    const d = await post('/api/kruskal',{
+      group_var:document.getElementById('kw-grp').value,
+      value_var:document.getElementById('kw-var').value
+    });
+    spin('kw',false);
+    const el = resWrap('kw',true);
+    const phRows = d.posthoc.map(p=>({'G1':p.g1,'G2':p.g2,'U':p.U,'p_ham':p.p_raw,'p_bonf':p.p_bonf,'Sig':p.sig?'✅ Anlamlı':'–'}));
+    el.innerHTML = `
+      ${statGrid([
+        {val:d.H,lbl:'H istatistiği'},{val:d.p,lbl:'p değeri'},
+        {val:d.stars,lbl:'Anlamlılık'},{val:d.epsilon2,lbl:'ε² (etki)'},
+      ])}
+      <div class="interpretation">${d.interpretation}</div>
+      <b>Post-hoc (Mann-Whitney + Bonferroni):</b>
+      ${tableFromRows(['G1','G2','U','p_ham','p_bonf','Sig'],phRows,r=>r['Sig'].startsWith('✅'))}
+      <div id="kw-chart" class="chart-wrap" style="height:420px;"></div>`;
+    chart(d.chart,'kw-chart');
+  }catch(e){spin('kw',false);alert('Hata: '+e.message);}
+}
+
+// ════════════════════════════════════════════════════════════════
+// CORRELATION
+// ════════════════════════════════════════════════════════════════
+async function runCorr(){
+  spin('corr',true); resWrap('corr',false);
+  try{
+    const d = await post('/api/correlation',{
+      var1:document.getElementById('corr-v1').value,
+      var2:document.getElementById('corr-v2').value,
+      method:document.getElementById('corr-method').value,
+      group_by:document.getElementById('corr-grp').value
+    });
+    spin('corr',false);
+    const el = resWrap('corr',true);
+    const rlbl = d.method==='pearson' ? 'r (Pearson)' : 'ρ (Spearman)';
+    el.innerHTML = `
+      ${statGrid([
+        {val:d.r,lbl:rlbl},{val:d.p,lbl:'p değeri'},
+        {val:d.stars,lbl:'Anlamlılık'},{val:d.n,lbl:'n'},
+        {val:'['+d.ci.join(', ')+']',lbl:'%95 GA',cls:d.significant?'sig':'nsig'}
+      ])}
+      <div class="interpretation">${d.interpretation}</div>
+      <div id="corr-chart" class="chart-wrap" style="height:440px;"></div>`;
+    chart(d.chart,'corr-chart');
+  }catch(e){spin('corr',false);alert('Hata: '+e.message);}
+}
+
+// ════════════════════════════════════════════════════════════════
+// CORR MATRIX
+// ════════════════════════════════════════════════════════════════
+async function runCorrMatrix(){
+  const vars = [...document.querySelectorAll('#cm-vars input:checked')].map(c=>c.value);
+  if(vars.length < 2){alert('En az 2 değişken seçin.'); return;}
+  spin('cm',true); resWrap('cm',false);
+  try{
+    const d = await post('/api/corrmatrix',{variables:vars, method:document.getElementById('cm-method').value});
+    spin('cm',false);
+    const el = resWrap('cm',true);
+    el.innerHTML = `<div id="cm-chart" class="chart-wrap" style="height:520px;"></div>`;
+    chart(d.chart,'cm-chart');
+  }catch(e){spin('cm',false);alert('Hata: '+e.message);}
+}
+
+// ════════════════════════════════════════════════════════════════
+// RELIABILITY
+// ════════════════════════════════════════════════════════════════
+async function runReliability(){
+  spin('rel',true); resWrap('rel',false);
+  try{
+    const d = await post('/api/reliability',{subscale:document.getElementById('rel-sub').value});
+    spin('rel',false);
+    const el = resWrap('rel',true);
+    const iRows = d.item_stats.map(i=>({'Madde':i.item,'Ort.':i.mean,'SS':i.std,'r_toplam':i.r_total,'α_silince':i.alpha_del}));
+    el.innerHTML = `
+      ${statGrid([
+        {val:d.alpha,lbl:"Cronbach's α"},{val:d.n_items,lbl:'Madde Sayısı'},
+        {val:d.n,lbl:'n (geçerli)'},{val:d.alpha_label,lbl:'Değerlendirme',cls:'sig'}
+      ])}
+      <div class="interpretation">${d.interpretation}</div>
+      <b>Madde Analizi:</b>
+      ${tableFromRows(['Madde','Ort.','SS','r_toplam','α_silince'],iRows,r=>r['r_toplam']<0.3)}
+      <div id="rel-chart" class="chart-wrap" style="height:400px;"></div>`;
+    chart(d.chart,'rel-chart');
+  }catch(e){spin('rel',false);alert('Hata: '+e.message);}
+}
+
+// ════════════════════════════════════════════════════════════════
+// SUBSCALE
+// ════════════════════════════════════════════════════════════════
+async function runSubscale(){
+  spin('sub',true); resWrap('sub',false);
+  try{
+    const d = await post('/api/subscale',{compare_by:document.getElementById('sub-grp').value});
+    spin('sub',false);
+    const el = resWrap('sub',true);
+    el.innerHTML = `<div id="sub-chart" class="chart-wrap" style="height:450px;"></div>`;
+    chart(d.chart,'sub-chart');
+  }catch(e){spin('sub',false);alert('Hata: '+e.message);}
+}
+
+// ════════════════════════════════════════════════════════════════
+// Boot
+// ════════════════════════════════════════════════════════════════
+init();
+</script>
+</body>
+</html>
