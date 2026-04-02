@@ -114,6 +114,20 @@ def cronbach(data):
     k = data.shape[1]
     return (k/(k-1)) * (1 - data.var(axis=0,ddof=1).sum() / data.sum(axis=1).var(ddof=1))
 
+def validity_html(is_ok, msg):
+    """Testin geçerliliğini gösteren renkli HTML satırı döndürür."""
+    if is_ok:
+        return f'<br><small class="text-success fw-semibold">✅ <b>Test geçerli:</b> {msg}</small>'
+    return f'<br><small class="text-warning fw-semibold">⚠️ <b>Geçerlilik uyarısı:</b> {msg}</small>'
+
+def normality_ok(arr):
+    """Shapiro-Wilk ile normallik sınar; True = normal dağılım (p > 0.05)."""
+    arr = np.array(arr)
+    if len(arr) < 3:
+        return True, 1.0          # çok az veri — varsayım test edilemez
+    _, p = shapiro(arr[:5000])
+    return bool(p > 0.05), float(p)
+
 # ══════════════════════════════════════════════════════════════════════════════
 # ROUTE: Ana sayfa
 # ══════════════════════════════════════════════════════════════════════════════
@@ -287,9 +301,14 @@ def api_chisquare():
     fig.update_layout(template='plotly_white', height=400,
                       title=f'Ki-Kare: {v1} × {v2}')
 
+    if low == 0:
+        vld = validity_html(True, 'Tüm beklenen frekanslar ≥ 5; ki-kare varsayımı sağlanıyor.')
+    else:
+        vld = validity_html(False,
+            f'{low} hücrede beklenen frekans < 5 (toplam hücrenin %{100*low//ct.size}\'i). '
+            f'Fisher\'s Exact testi veya hücre birleştirme düşünülmelidir.')
     interp = (f'<b>{v1} × {v2}</b>: χ²={chi2:.3f}, df={dof}, {sig_badge(p)}. '
-              f"Cramér's V={cv:.3f} → <b>{effect_label(cv,'v')}</b> etki. "
-              f"{'⚠️ '+str(low)+' hücrede beklenen <5 — sonuçlar ihtiyatla yorumlanmalı.' if low else '✅ Tüm beklenen frekanslar ≥5.'}")
+              f"Cramér's V={cv:.3f} → <b>{effect_label(cv,'v')}</b> etki.{vld}")
     ct_html = ct.to_html(classes='table table-sm table-bordered text-center', border=0)
     return ok({'chi2':round(chi2,4),'df':dof,'p':round(p,6),'cramers_v':round(cv,4),
                     'effect':effect_label(cv,'v'),'stars':stars(p),'significant':p<.05,
@@ -329,12 +348,22 @@ def api_ttest():
     fig.update_layout(template='plotly_white', height=400,
                       title=f'T-Testi: {vvar} — {gvar}')
 
+    n1_ok, n1_p = normality_ok(g1)
+    n2_ok, n2_p = normality_ok(g2)
+    if n1_ok and n2_ok:
+        vld = validity_html(True, 'Her iki grup da normal dağılıma uygun (Shapiro-Wilk p > 0.05). T-testi varsayımları sağlanıyor.')
+    else:
+        vld = validity_html(False,
+            f'En az bir grup normal dağılmıyor '
+            f'({grps[0]}: p={n1_p:.3f}, {grps[1]}: p={n2_p:.3f}). '
+            f'Parametrik olmayan <b>Mann-Whitney U testi</b> tercih edilmelidir.')
     interp = (f'<b>{grps[0]}</b> (n={len(g1)}, Ort={g1.mean():.3f}) vs '
               f'<b>{grps[1]}</b> (n={len(g2)}, Ort={g2.mean():.3f}): '
               f"{'Welch' if not eq else 'Student'} t={t:.3f}, {sig_badge(p)}. "
               f"Cohen's d={d:.3f} → <b>{effect_label(d,'d')}</b> etki. "
               f'%95 GA: [{ci[0]}, {ci[1]}]. '
-              f"Levene p={lev_p:.3f} → varyanslar {'eşit ✅' if eq else 'eşit değil ⚠️ (Welch kullanıldı)'}.")
+              f"Levene p={lev_p:.3f} → varyanslar {'eşit ✅' if eq else 'eşit değil ⚠️ (Welch kullanıldı)'}."
+              f'{vld}')
     return ok({'t':round(float(t),4),'p':round(float(p),6),'d':round(d,4),
                     'effect':effect_label(d,'d'),'stars':stars(p),'significant':p<.05,
                     'ci':ci,'levene_p':round(float(lev_p),4),'equal_var':bool(eq),
@@ -363,8 +392,14 @@ def api_mannwhitney():
                              boxpoints='all', jitter=0.3))
     fig.update_layout(template='plotly_white', height=380,
                       title=f'Mann-Whitney U: {vvar} — {gvar}')
+    mw_n1_ok, _ = normality_ok(g1)
+    mw_n2_ok, _ = normality_ok(g2)
+    if mw_n1_ok and mw_n2_ok:
+        vld = validity_html(True, 'Her iki grup da normal dağılıma uygun; parametrik <b>T-testi</b> daha güçlü bir alternatif olabilir. Mann-Whitney yine de geçerlidir.')
+    else:
+        vld = validity_html(True, 'Dağılım normallik varsayımı gerektirmez. İki bağımsız grup için uygun parametrik olmayan testtir.')
     interp = (f'<b>{grps[0]}</b> (md={g1.median():.3f}) vs <b>{grps[1]}</b> (md={g2.median():.3f}): '
-              f'U={u:.1f}, {sig_badge(p)}. r={r:.3f} → <b>{effect_label(r,"r")}</b> etki.')
+              f'U={u:.1f}, {sig_badge(p)}. r={r:.3f} → <b>{effect_label(r,"r")}</b> etki.{vld}')
     return ok({'U':round(float(u),2),'p':round(float(p),6),'r':round(r,4),
                     'effect':effect_label(r,'r'),'stars':stars(p),'significant':p<.05,
                     'groups':[{'name':str(grps[0]),'n':n1,'median':round(float(g1.median()),4),'mean':round(float(g1.mean()),4)},
@@ -408,9 +443,24 @@ def api_anova():
                       title=f'ANOVA: {vvar} — {gvar}')
 
     n_sig = sum(ph['sig'] for ph in posthoc)
+    anova_norm = [normality_ok(g) for g in gdata]
+    all_normal = all(ok_ for ok_, _ in anova_norm)
+    lev_s2, lev_p2 = levene(*[np.array(g) for g in gdata])
+    homogen = lev_p2 > 0.05
+    if all_normal and homogen:
+        vld = validity_html(True, 'Tüm gruplar normal dağılıma uygun ve varyanslar homojen (Levene p={:.3f}). ANOVA varsayımları sağlanıyor.'.format(lev_p2))
+    elif not all_normal:
+        non_n = [str(lbls[i]) for i,(ok_,_) in enumerate(anova_norm) if not ok_]
+        vld = validity_html(False,
+            f'Şu grup(lar) normal dağılmıyor: <b>{", ".join(non_n)}</b>. '
+            f'Parametrik olmayan <b>Kruskal-Wallis testi</b> tercih edilmelidir.')
+    else:
+        vld = validity_html(False,
+            f'Varyanslar homojen değil (Levene p={lev_p2:.3f}). '
+            f'Welch ANOVA veya <b>Kruskal-Wallis</b> düşünülmelidir.')
     interp = (f'Tek yönlü ANOVA: F({len(lbls)-1},{sum(len(g) for g in gdata)-len(lbls)})={F:.3f}, '
               f'{sig_badge(p)}. η²={eta2:.3f} → <b>{effect_label(eta2,"e")}</b> etki. '
-              f'Post-hoc (Bonferroni): {n_sig}/{len(posthoc)} karşılaştırma anlamlı.')
+              f'Post-hoc (Bonferroni): {n_sig}/{len(posthoc)} karşılaştırma anlamlı.{vld}')
     gstats = [{'name':str(l),'n':len(g),'mean':round(float(np.mean(g)),4),'std':round(float(np.std(g,ddof=1)),4)} for l,g in zip(lbls,gdata)]
     return ok({'F':round(float(F),4),'p':round(float(p),6),'eta2':round(eta2,4),
                     'effect':effect_label(eta2,'e'),'stars':stars(p),'significant':p<.05,
@@ -443,8 +493,14 @@ def api_kruskal():
     fig.update_layout(template='plotly_white', height=400,
                       title=f'Kruskal-Wallis: {vvar} — {gvar}', yaxis_title=vvar)
     n_sig = sum(ph['sig'] for ph in posthoc)
+    kw_norm = [normality_ok(g) for g in gdata]
+    kw_all_normal = all(ok_ for ok_, _ in kw_norm)
+    if kw_all_normal:
+        vld = validity_html(True, 'Tüm gruplar normal dağılıma uygun; parametrik <b>ANOVA</b> daha güçlü olabilir. Kruskal-Wallis yine de geçerlidir.')
+    else:
+        vld = validity_html(True, 'Normallik varsayımı gerektirmez. Dağılımı normal olmayan çok gruplu karşılaştırmalar için doğru seçimdir.')
     interp = (f'Kruskal-Wallis: H={H:.3f}, {sig_badge(p)}. '
-              f'ε²={eps2:.3f}. Post-hoc (MW+Bonferroni): {n_sig}/{len(posthoc)} anlamlı.')
+              f'ε²={eps2:.3f}. Post-hoc (MW+Bonferroni): {n_sig}/{len(posthoc)} anlamlı.{vld}')
     return ok({'H':round(float(H),4),'p':round(float(p),6),'epsilon2':round(eps2,4),
                     'stars':stars(p),'significant':p<.05,'posthoc':posthoc,
                     'interpretation':interp,'chart':fjson(fig)})
@@ -486,8 +542,20 @@ def api_correlation():
     dir_lbl = ('Güçlü pozitif' if r>.5 else 'Orta pozitif' if r>.3 else
                'Zayıf pozitif' if r>0 else 'Zayıf negatif' if r>-.3 else
                'Orta negatif' if r>-.5 else 'Güçlü negatif')
+    if method == 'pearson':
+        xn_ok, xn_p = normality_ok(x)
+        yn_ok, yn_p = normality_ok(y)
+        if xn_ok and yn_ok:
+            vld = validity_html(True, 'Her iki değişken de normal dağılıma uygun. Pearson korelasyonu varsayımları sağlanıyor.')
+        else:
+            vld = validity_html(False,
+                f'Değişkenlerden en az biri normal dağılmıyor '
+                f'({v1}: p={xn_p:.3f}, {v2}: p={yn_p:.3f}). '
+                f'<b>Spearman korelasyonu</b> tercih edilmelidir.')
+    else:
+        vld = validity_html(True, 'Spearman korelasyonu dağılımdan bağımsızdır; normallik varsayımı gerektirmez.')
     interp = (f'{method.capitalize()}: <b>{rlbl}={r:.4f}</b>, {sig_badge(p)}. '
-              f'%95 GA: [{ci[0]}, {ci[1]}]. <b>{dir_lbl}</b> ilişki → {effect_label(r,"r")} etki.')
+              f'%95 GA: [{ci[0]}, {ci[1]}]. <b>{dir_lbl}</b> ilişki → {effect_label(r,"r")} etki.{vld}')
     return ok({'r':round(r,4),'p':round(p,6),'method':method,'n':n,'ci':ci,
                     'stars':stars(p),'significant':p<.05,'interpretation':interp,'chart':fjson(fig)})
 
@@ -764,11 +832,15 @@ def api_wilcoxon():
 
     sig = p < 0.05
     sig_msg = "Medyan fark 0'dan anlamlı biçimde farklı." if sig else "Medyan fark 0'dan anlamlı biçimde farklı değil."
+    if n >= 10:
+        vld = validity_html(True, f'Yeterli gözlem sayısı (n={n}, sıfır hariç). Parametrik olmayan eşleştirilmiş karşılaştırma için uygundur.')
+    else:
+        vld = validity_html(False, f'Sıfır-dışı fark sayısı az (n={n}). Sonuçlar ihtiyatla yorumlanmalıdır; en az 10 gözlem önerilir.')
     interp = (
         f'<b>Wilcoxon İşaretli Sıra Testi</b> — {label}: '
         f'W={w_stat:.1f}, {sig_badge(p)}. '
         f'r={r_eff:.3f} → <b>{effect_label(r_eff, "r")}</b> etki. '
-        f'Pozitif fark: {pos}, Negatif fark: {neg}, Sıfır: {zero}. {sig_msg}'
+        f'Pozitif fark: {pos}, Negatif fark: {neg}, Sıfır: {zero}. {sig_msg}{vld}'
     )
     return ok({
         'W': round(float(w_stat), 3), 'p': round(float(p), 6),
